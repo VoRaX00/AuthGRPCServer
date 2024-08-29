@@ -5,6 +5,8 @@ import (
 	"gRPCServiceAuth/internal/config"
 	"log/slog"
 	"os"
+	"os/signal"
+	"syscall"
 )
 
 const (
@@ -18,7 +20,18 @@ func main() {
 	logger := setupLogger(cfg.Env)
 	application := app.New(logger, cfg.GRPC.Port, cfg.StoragePath, cfg.TokenTTL)
 
-	application.GRPCServer.MustStart()
+	go application.GRPCServer.MustStart()
+
+	stop := make(chan os.Signal, 1)
+	signal.Notify(stop, syscall.SIGTERM, syscall.SIGINT)
+
+	sign := <-stop
+
+	logger.Info("stopping application", slog.String("signal", sign.String()))
+
+	application.GRPCServer.Stop()
+
+	logger.Info("application stopped")
 }
 
 func setupLogger(env string) *slog.Logger {
